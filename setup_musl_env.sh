@@ -32,26 +32,43 @@ cd build/apk || exit
   export APK_KEYS_PATH="$(realpath usr/share/apk/keys)"
 cd ../.. || exit
 
-echo $PATH
-
 # Bootstrap Alpine Linux
 apk.static \
   -X "$MIRROR/edge/main" -U -p musl_root --initdb \
-  --keys-dir "$APK_KEYS_PATH" --cache-dir "$(root_path packages/apk_cache)" \
-  add alpine-base alpine-sdk llvm15 clang15 musl-dev libstdc++-dev compiler-rt lld gcc
+  --keys-dir "$APK_KEYS_PATH" --cache-dir "$(root_path packages/apk_cache)" add \
+  alpine-base alpine-sdk libc6-compat llvm15 clang15 gcc lld libstdc++-dev compiler-rt
 
 # Activate the musl root since we're about to do some custom builds
 use_musl_root
-"$(/usr/bin/which busybox)" --install -s musl_root/bin || exit
+"$(/usr/bin/which busybox)" --install musl_root/bin || exit
 /usr/bin/sed --in-place=.bak "s_/bin/ash -e_/usr/bin/env ash_" musl_root/usr/bin/abuild || exit
+
+# Setup abuild and our new repository
+export REPODEST="$(root_path build/packages)"
+mkdir "$REPODEST" || exit
+if [ ! -d ~/.abuild ]; then
+  abuild-keygen -q -n -a || exit
+fi
 
 # Do the custom musl build
 cd build || exit
   cp -r "$SCRIPT_DIR/musl" musl || exit
   cd musl || exit
+    export CFLAGS="$CFLAGS_ABULID"
+    SAFESTACK_O="$(root_path musl_root/usr/lib/clang)"
+    SAFESTACK_O="$(echo "$SAFESTACK_O"/*/lib/linux/libclang_rt.safestack-x86_64.a)"
+    export LDFLAGS="$LDFLAGS -Wl,$SAFESTACK_O"
     abuild || exit
   cd .. || exit
 cd .. || exit
+
+# Install our custom packages
+apk \
+  -X "$REPODEST/build" -U -p musl_root --keys-dir ~/.abuild --cache-dir "$(root_path packages/apk_cache)" \
+  add libc6-compat musl musl-dbg musl-dev musl-libintl musl-utils
+apk \
+  -X "$REPODEST/build" -U -p musl_root --keys-dir ~/.abuild --cache-dir "$(root_path packages/apk_cache)" \
+  upgrade
 
 # Delete the build directory
 rm -rf build

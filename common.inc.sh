@@ -42,32 +42,40 @@ use_musl_root() {
   export CFLAGS="$CFLAGS_COMMON_SIZE"
   export LDFLAGS="$CFLAGS_COMMON_SIZE"
 
+  export APK="apk -p $(root_path musl_root)"
   export ABUILD_SHAREDIR="$(root_path musl_root/usr/share/abuild)"
+  export FAKEROOT="fakeroot -l $(root_path musl_root/usr/lib/libfakeroot.so)"
 }
 
 strip_flags() {
   # shellcheck disable=SC2001
-  echo -n "$1" | tr -d "\n" | sed -e "s/\s\+/ /g"
+  echo -n " $1 " | tr -d "\n" | sed -e "s/\s\+/ /g"
 }
 
 # Common C Flags
 BUILD_TARGET="x86_64-unknown-linux-gnu"
 
 CFLAGS_BASIC="
-  -flto=full -fuse-ld=lld -target $BUILD_TARGET -rtlib=compiler-rt -static
-  -L $(root_path musl_root/lib) -L $(root_path musl_root/usr/lib)
+  -target $BUILD_TARGET -rtlib=compiler-rt -L $(root_path musl_root/lib) -L $(root_path musl_root/usr/lib)
 "
-CFLAGS_HARDENING="
+CFLAGS_LTO="
+  -flto=full -fuse-ld=lld
+"
+CFLAGS_HARDENING_BASIC="
   -D_FORTIFY_SOURCE=2 -fPIE
   -fstack-protector-strong -fsanitize=safe-stack -fPIE -fstack-clash-protection
-  -fsanitize=cfi -fvisibility=hidden
-  -fvirtual-function-elimination
+"
+CFLAGS_HARDENING="
+  $CFLAGS_LTO $CFLAGS_HARDENING_BASIC
+  -fsanitize=cfi -fvisibility=hidden -fvirtual-function-elimination
 "
 
-CFLAGS_COMMON_SIZE="-Os $(strip_flags "$CFLAGS_BASIC") $(strip_flags "$CFLAGS_HARDENING")"
-CFLAGS_COMMON_OPT="-O2 $(strip_flags "$CFLAGS_BASIC") $(strip_flags "$CFLAGS_HARDENING")"
+CFLAGS_COMMON_SIZE="-Os -static $(strip_flags "$CFLAGS_BASIC") $(strip_flags "$CFLAGS_HARDENING")"
+CFLAGS_COMMON_OPT="-O2 -static $(strip_flags "$CFLAGS_BASIC") $(strip_flags "$CFLAGS_HARDENING")"
 
-CFLAGS_COMMON_UNHARDENED_SIZE="-Os $(strip_flags "$CFLAGS_BASIC")"
-CFLAGS_COMMON_UNHARDENED_OPT="-O2 $(strip_flags "$CFLAGS_BASIC")"
+CFLAGS_COMMON_UNHARDENED_SIZE="-Os -static $(strip_flags "$CFLAGS_BASIC") $(strip_flags "$CFLAGS_LTO")"
+CFLAGS_COMMON_UNHARDENED_OPT="-O2 -static $(strip_flags "$CFLAGS_BASIC") $(strip_flags "$CFLAGS_LTO")"
+
+CFLAGS_ABULID="-O2 $(strip_flags "$CFLAGS_BASIC") $(strip_flags "$CFLAGS_HARDENING_BASIC")"
 
 MAKE_CT="-j$(nproc --all)" # Flag for number of processors for `make`

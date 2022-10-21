@@ -2,7 +2,7 @@
 # Maintainer: Timo Teräs <timo.teras@iki.fi>
 pkgname=musl
 pkgver=1.2.3
-pkgrel=1
+pkgrel=100 # Custom version so this takes precedence.
 pkgdesc="the musl c library (libc) implementation"
 url="https://musl.libc.org/"
 arch="all"
@@ -22,6 +22,7 @@ esac
 _commit="v1.2.3"
 source="musl-$_commit.tar.gz::https://git.musl-libc.org/cgit/musl/snapshot/$_commit.tar.gz
 	handle-aux-at_base.patch
+	implement_preinit_array.patch
 
 	ldconfig
 	__stack_chk_fail_local.c
@@ -44,14 +45,14 @@ build() {
 	[ "$BOOTSTRAP" = "nocc" ] && return 0
 
 	# provide minimal libssp_nonshared.a so we don't need libssp from gcc
-	${CROSS_COMPILE}gcc $CPPFLAGS $CFLAGS -c "$srcdir"/__stack_chk_fail_local.c -o __stack_chk_fail_local.o
-	${CROSS_COMPILE}ar r libssp_nonshared.a __stack_chk_fail_local.o
+	"$CC" $CPPFLAGS $CFLAGS -c "$srcdir"/__stack_chk_fail_local.c -o __stack_chk_fail_local.o
+	"$AR" r libssp_nonshared.a __stack_chk_fail_local.o
 
 	if [ "$BOOTSTRAP" != "nolibc" ]; then
 		# getconf/getent/iconv
 		local i
 		for i in getconf getent iconv ; do
-			${CROSS_COMPILE}gcc $CPPFLAGS $CFLAGS "$srcdir"/$i.c -o $i
+			"$CC" $CPPFLAGS $CFLAGS "$srcdir"/$i.c -o $i
 		done
 	fi
 
@@ -67,7 +68,7 @@ build() {
 		--localstatedir=/var \
 		--enable-debug \
 		--disable-eh-frame
-	make
+	make -j$(nproc --all)
 }
 
 package() {
@@ -87,7 +88,7 @@ package() {
 	if [ "$BOOTSTRAP" = "nocc" ]; then
 		make ARCH="$ARCH" prefix=/usr DESTDIR="$pkgdir" install-headers
 	else
-		make "-j$(nproc --all)" DESTDIR="$pkgdir" install
+		make DESTDIR="$pkgdir" install
 
 		cp libssp_nonshared.a "$pkgdir"/usr/lib
 
@@ -166,6 +167,7 @@ compat() {
 sha512sums="
 9a1b8f9208d99582ac00e3c46c829aa1fad3b7f09aa7d6822f02f25542453d3d977c69519ad01430b8dd624ac9dc70f47d611e36aefd7fef31ea47a7679e3111  musl-v1.2.3.tar.gz
 a76f79b801497ad994746cf82bb6eaf86f9e1ae646e6819fbae8532a7f4eee53a96ac1d4e789ec8f66aea2a68027b0597f7a579b3369e01258da8accfce41370  handle-aux-at_base.patch
+ad80a2f3bf52b0cb16bfc57b32f0589b2d572f834867cd76377deba75bc62b254bd42cba9dec69adb7f0de518ff7688e4cf2eb1cf250a8c30ffa52f082f14c76  implement_preinit_array.patch
 8d3a2d5315fc56fee7da9abb8b89bb38c6046c33d154c10d168fb35bfde6b0cf9f13042a3bceee34daf091bc409d699223735dcf19f382eeee1f6be34154f26f  ldconfig
 062bb49fa54839010acd4af113e20f7263dde1c8a2ca359b5fb2661ef9ed9d84a0f7c3bc10c25dcfa10bb3c5a4874588dff636ac43d5dbb3d748d75400756d0b  __stack_chk_fail_local.c
 0d80f37b34a35e3d14b012257c50862dfeb9d2c81139ea2dfa101d981d093b009b9fa450ba27a708ac59377a48626971dfc58e20a3799084a65777a0c32cbc7d  getconf.c

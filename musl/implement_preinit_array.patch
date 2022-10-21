@@ -1,0 +1,68 @@
+diff -Naur musl-1.2.3/ldso/dynlink.c musl-1.2.3-patched/ldso/dynlink.c
+--- musl-1.2.3/ldso/dynlink.c	2022-10-21 08:13:49.812201140 -0700
++++ musl-1.2.3-patched/ldso/dynlink.c	2022-10-21 08:21:51.765176585 -0700
+@@ -151,10 +151,13 @@
+ 
+ extern hidden int __malloc_replaced;
+ 
+-hidden void (*const __init_array_start)(void)=0, (*const __fini_array_start)(void)=0;
++hidden void (*const __preinit_array_start)(void)=0, (*const __init_array_start)(void)=0,
++            (*const __fini_array_start)(void)=0;
+ 
+-extern hidden void (*const __init_array_end)(void), (*const __fini_array_end)(void);
++extern hidden void (*const __preinit_array_end)(void), (*const __init_array_end)(void),
++                   (*const __fini_array_end)(void);
+ 
++weak_alias(__preinit_array_start, __preinit_array_end);
+ weak_alias(__init_array_start, __init_array_end);
+ weak_alias(__fini_array_start, __fini_array_end);
+ 
+@@ -1534,6 +1537,11 @@
+ 		if ((dyn[0] & (1<<DT_INIT)) && dyn[DT_INIT])
+ 			fpaddr(p, dyn[DT_INIT])();
+ #endif
++		if (dyn[0] & (1<<DT_PREINIT_ARRAY)) {
++			size_t n = dyn[DT_PREINIT_ARRAYSZ]/sizeof(size_t);
++			size_t *fn = laddr(p, dyn[DT_PREINIT_ARRAY]);
++			while (n--) ((void (*)(void))*fn++)();
++		}
+ 		if (dyn[0] & (1<<DT_INIT_ARRAY)) {
+ 			size_t n = dyn[DT_INIT_ARRAYSZ]/sizeof(size_t);
+ 			size_t *fn = laddr(p, dyn[DT_INIT_ARRAY]);
+diff -Naur musl-1.2.3/src/env/__libc_start_main.c musl-1.2.3-patched/src/env/__libc_start_main.c
+--- musl-1.2.3/src/env/__libc_start_main.c	2022-10-21 08:13:49.814201211 -0700
++++ musl-1.2.3-patched/src/env/__libc_start_main.c	2022-10-21 08:18:29.661059807 -0700
+@@ -11,6 +11,7 @@
+ weak_alias(dummy, _init);
+ 
+ extern weak hidden void (*const __init_array_start)(void), (*const __init_array_end)(void);
++extern weak hidden void (*const __preinit_array_start)(void), (*const __preinit_array_end)(void);
+ 
+ static void dummy1(void *p) {}
+ weak_alias(dummy1, __init_ssp);
+@@ -59,7 +60,10 @@
+ static void libc_start_init(void)
+ {
+ 	_init();
+-	uintptr_t a = (uintptr_t)&__init_array_start;
++	uintptr_t a = (uintptr_t)&__preinit_array_start;
++	for (; a<(uintptr_t)&__preinit_array_end; a+=sizeof(void(*)()))
++		(*(void (**)(void))a)();
++	a = (uintptr_t)&__init_array_start;
+ 	for (; a<(uintptr_t)&__init_array_end; a+=sizeof(void(*)()))
+ 		(*(void (**)(void))a)();
+ }
+diff -Naur musl-1.2.3/src/internal/dynlink.h musl-1.2.3-patched/src/internal/dynlink.h
+--- musl-1.2.3/src/internal/dynlink.h	2022-10-21 08:13:49.816201281 -0700
++++ musl-1.2.3-patched/src/internal/dynlink.h	2022-10-21 08:20:24.805114732 -0700
+@@ -92,8 +92,8 @@
+ #define DT_DEBUG_INDIRECT 0
+ #endif
+ 
+-#define AUX_CNT 32
+-#define DYN_CNT 32
++#define AUX_CNT 64
++#define DYN_CNT 64
+ 
+ typedef void (*stage2_func)(unsigned char *, size_t *);
+ 
