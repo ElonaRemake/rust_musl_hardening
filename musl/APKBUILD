@@ -45,14 +45,14 @@ build() {
 	[ "$BOOTSTRAP" = "nocc" ] && return 0
 
 	# provide minimal libssp_nonshared.a so we don't need libssp from gcc
-	"$CC" $CPPFLAGS $CFLAGS -c "$srcdir"/__stack_chk_fail_local.c -o __stack_chk_fail_local.o
-	"$AR" r libssp_nonshared.a __stack_chk_fail_local.o
+	"$CC" $CPPFLAGS $CFLAGS -c "$srcdir"/__stack_chk_fail_local.c -o __stack_chk_fail_local.o || exit 1
+	"$AR" r libssp_nonshared.a __stack_chk_fail_local.o || exit 1
 
 	if [ "$BOOTSTRAP" != "nolibc" ]; then
 		# getconf/getent/iconv
 		local i
 		for i in getconf getent iconv ; do
-			"$CC" $CPPFLAGS $CFLAGS "$srcdir"/$i.c -o $i
+			"$CC" $CPPFLAGS $CFLAGS "$srcdir"/$i.c -o $i || exit 1
 		done
 	fi
 
