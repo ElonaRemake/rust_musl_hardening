@@ -61,10 +61,13 @@ alpine() {
   PATH="$ALPINE_ROOT/bin:$ALPINE_ROOT/usr/bin" \
   LD_LIBRARY_PATH="$ALPINE_ROOT/lib:$ALPINE_ROOT/usr/lib" \
     "$ALPINE_ROOT/usr/bin/proot" \
-      -R "$ALPINE_ROOT" -b "$ALPINE_USR_ROOT" -b ~/.abuild \
+      -r "$ALPINE_ROOT" -b "$REPO_ROOT" \
+      -b ~/.abuild -b ~/.rustup/toolchains -b ~/.rustup/update-hashes \
+      -b /etc/passwd -b /etc/group -b /etc/resolv.conf -b /etc/localtime \
+      -b /dev -b /sys -b /proc -b /tmp -b /run -b /var/run/dbus/system_bus_socket \
     /bin/busybox env -i \
       USER="$USER" HOME="/home/$USER" LANG="$LANG" TERM="$TERM" \
-      PATH="/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin" \
+      PATH="/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/sbin:/usr/local/bin:$HOME/.cargo/bin:$ALPINE_USR_ROOT/bin" \
       AR="llvm-ar" RANLIB="llvm-ranlib" CC="clang" CXX="clang++" \
       LIBRARY_PATH="$ALPINE_USR_ROOT/lib:/lib:/usr/lib:/usr/local/lib" \
       C_INCLUDE_PATH="$ALPINE_USR_ROOT/include:/include:/usr/include:/usr/local/include" \

@@ -63,5 +63,9 @@ use_flags "$OPT_LEVEL $CFLAGS_BASIC $CFLAGS_HARDENING -fvisibility=hidden"
 abuild_dir "$SCRIPT_DIR/aports/hardened-malloc"
 apk -U --no-cache add hardened-malloc
 
+# Install rustc
+apk add rustup
+alpine rustup-init --default-toolchain nightly -y || exit 1
+
 # Delete the build directory
 rm -rf build
