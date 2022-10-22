@@ -48,21 +48,27 @@ use_musl_root() {
   export C_INCLUDE_PATH="$(root_path musl_usr/include):$(root_path musl_root/usr/include)"
   export CPLUS_INCLUDE_PATH="$(root_path musl_usr/include):$(root_path musl_root/usr/include)"
 
-  export CFLAGS="$CFLAGS_COMMON"
-  export LDFLAGS="$LDFLAGS_COMMON"
+  export CFLAGS="$CFLAGS_COMMON_UNHARDENED"
+  export LDFLAGS=""
+  export LTCFLAGS="-static"
 
-  export APK="apk -p $(root_path musl_root)"
+  export APK="apk -p $(root_path musl_root) --allow-untrusted --no-network"
   export ABUILD_SHAREDIR="$(root_path musl_root/usr/share/abuild)"
   export FAKEROOT="fakeroot -l $(root_path musl_root/usr/lib/libfakeroot.so)"
 }
 
 use_hardened_flags() {
   export CFLAGS="$(strip_flags "$CFLAGS_COMMON $1")"
-  export LDFLAGS="$(strip_flags "$CFLAGS_COMMON $1 $2")"
+  export LDFLAGS="$(strip_flags "$2") -Wl,-lhardened_malloc"
 }
 use_unhardened_flags() {
   export CFLAGS="$(strip_flags "$CFLAGS_COMMON_UNHARDENED $1")"
-  export LDFLAGS="$(strip_flags "$CFLAGS_COMMON_UNHARDENED $1 $2")"
+  export LDFLAGS="$(strip_flags "$2")"
+}
+
+use_flags() {
+  export CFLAGS="$(strip_flags "$1")"
+  export LDFLAGS="$(strip_flags "$1 $2")"
 }
 
 strip_flags() {
@@ -83,23 +89,23 @@ if [ "$OPT_LEVEL" = "" ]; then
 fi
 
 CFLAGS_BASIC="$(strip_flags "
-  $OPT_LEVEL -target $BUILD_TARGET
-  -rtlib=compiler-rt -L$(root_path musl_root/usr/lib) -L$(root_path musl_root/lib)
-  -static -Wl,--static
+  -Wno-unused-command-line-argument -Wno-unknown-warning-option
+  -target $BUILD_TARGET -fuse-ld=lld -rtlib=compiler-rt -static -all-static -Wl,--static,--as-needed
+  -L$(root_path musl_root/usr/lib) -L$(root_path musl_root/lib)
 ")"
 CFLAGS_LTO="$(strip_flags "
-  -flto=full -fuse-ld=lld
+  -flto=full -Wl,--lto-whole-program-visibility
 ")"
 CFLAGS_HARDENING_BASIC="$(strip_flags "
   -D_FORTIFY_SOURCE=2 -fPIE -fstack-protector-strong -fstack-clash-protection
+  -static-pie -pie
 ")"
 CFLAGS_HARDENING="$(strip_flags "
   $CFLAGS_LTO $CFLAGS_HARDENING_BASIC
-  -fsanitize=cfi -fvisibility=hidden -fvirtual-function-elimination -fsanitize=safe-stack
+  -fsanitize=cfi -fvirtual-function-elimination -fsanitize=safe-stack
 ")"
 
-CFLAGS_COMMON="$CFLAGS_BASIC $CFLAGS_HARDENING"
-CFLAGS_COMMON_UNHARDENED="$CFLAGS_BASIC $CFLAGS_LTO"
-CFLAGS_ABULID_MUSL="$CFLAGS_BASIC $CFLAGS_HARDENING_BASIC"
+CFLAGS_COMMON="$OPT_LEVEL $CFLAGS_BASIC $CFLAGS_HARDENING -fvisibility=hidden"
+CFLAGS_COMMON_UNHARDENED="$OPT_LEVEL $CFLAGS_BASIC $CFLAGS_LTO -fvisibility=hidden"
 
 MAKE_CT="-j$(nproc --all)" # Flag for number of processors for `make`

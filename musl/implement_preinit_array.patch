@@ -1,6 +1,6 @@
 diff -Naur musl-1.2.3/ldso/dynlink.c musl-1.2.3-patched/ldso/dynlink.c
 --- musl-1.2.3/ldso/dynlink.c	2022-10-21 08:13:49.812201140 -0700
-+++ musl-1.2.3-patched/ldso/dynlink.c	2022-10-21 08:21:51.765176585 -0700
++++ musl-1.2.3-patched/ldso/dynlink.c	2022-10-21 11:40:42.428408722 -0700
 @@ -151,10 +151,13 @@
  
  extern hidden int __malloc_replaced;
@@ -29,18 +29,64 @@ diff -Naur musl-1.2.3/ldso/dynlink.c musl-1.2.3-patched/ldso/dynlink.c
  		if (dyn[0] & (1<<DT_INIT_ARRAY)) {
  			size_t n = dyn[DT_INIT_ARRAYSZ]/sizeof(size_t);
  			size_t *fn = laddr(p, dyn[DT_INIT_ARRAY]);
+@@ -1639,7 +1647,7 @@
+  * linker itself, but some of the relocations performed may need to be
+  * replaced later due to copy relocations in the main program. */
+ 
+-hidden void __dls2(unsigned char *base, size_t *sp)
++__attribute__((__visibility__("default"))) void __dls2(unsigned char *base, size_t *sp)
+ {
+ 	size_t *auxv;
+ 	for (auxv=sp+1+*sp+1; *auxv; auxv++);
+diff -Naur musl-1.2.3/src/env/__init_tls.c musl-1.2.3-patched/src/env/__init_tls.c
+--- musl-1.2.3/src/env/__init_tls.c	2022-10-21 08:13:49.815201246 -0700
++++ musl-1.2.3-patched/src/env/__init_tls.c	2022-10-21 11:52:44.541139149 -0700
+@@ -11,6 +11,7 @@
+ 
+ volatile int __thread_list_lock;
+ 
++__attribute__((no_sanitize("safe-stack")))
+ int __init_tp(void *p)
+ {
+ 	pthread_t td = p;
+@@ -36,6 +37,7 @@
+ 
+ static struct tls_module main_tls;
+ 
++__attribute__((no_sanitize("safe-stack")))
+ void *__copy_tls(unsigned char *mem)
+ {
+ 	pthread_t td;
+@@ -81,6 +83,7 @@
+ 
+ extern weak hidden const size_t _DYNAMIC[];
+ 
++__attribute__((no_sanitize("safe-stack")))
+ static void static_init_tls(size_t *aux)
+ {
+ 	unsigned char *p;
 diff -Naur musl-1.2.3/src/env/__libc_start_main.c musl-1.2.3-patched/src/env/__libc_start_main.c
 --- musl-1.2.3/src/env/__libc_start_main.c	2022-10-21 08:13:49.814201211 -0700
-+++ musl-1.2.3-patched/src/env/__libc_start_main.c	2022-10-21 08:18:29.661059807 -0700
-@@ -11,6 +11,7 @@
++++ musl-1.2.3-patched/src/env/__libc_start_main.c	2022-10-21 11:53:11.944078732 -0700
+@@ -11,7 +11,9 @@
  weak_alias(dummy, _init);
  
  extern weak hidden void (*const __init_array_start)(void), (*const __init_array_end)(void);
 +extern weak hidden void (*const __preinit_array_start)(void), (*const __preinit_array_end)(void);
  
++__attribute__((no_sanitize("safe-stack")))
  static void dummy1(void *p) {}
  weak_alias(dummy1, __init_ssp);
-@@ -59,7 +60,10 @@
+ 
+@@ -20,6 +22,7 @@
+ #ifdef __GNUC__
+ __attribute__((__noinline__))
+ #endif
++__attribute__((no_sanitize("safe-stack")))
+ void __init_libc(char **envp, char *pn)
+ {
+ 	size_t i, *auxv, aux[AUX_CNT] = { 0 };
+@@ -59,7 +62,10 @@
  static void libc_start_init(void)
  {
  	_init();
@@ -52,6 +98,28 @@ diff -Naur musl-1.2.3/src/env/__libc_start_main.c musl-1.2.3-patched/src/env/__l
  	for (; a<(uintptr_t)&__init_array_end; a+=sizeof(void(*)()))
  		(*(void (**)(void))a)();
  }
+diff -Naur musl-1.2.3/src/env/__reset_tls.c musl-1.2.3-patched/src/env/__reset_tls.c
+--- musl-1.2.3/src/env/__reset_tls.c	2022-10-21 08:13:49.814201211 -0700
++++ musl-1.2.3-patched/src/env/__reset_tls.c	2022-10-21 11:52:56.351544091 -0700
+@@ -2,6 +2,7 @@
+ #include "pthread_impl.h"
+ #include "libc.h"
+ 
++__attribute__((no_sanitize("safe-stack")))
+ void __reset_tls()
+ {
+ 	pthread_t self = __pthread_self();
+diff -Naur musl-1.2.3/src/env/__stack_chk_fail.c musl-1.2.3-patched/src/env/__stack_chk_fail.c
+--- musl-1.2.3/src/env/__stack_chk_fail.c	2022-10-21 08:13:49.814201211 -0700
++++ musl-1.2.3-patched/src/env/__stack_chk_fail.c	2022-10-21 11:53:34.625856494 -0700
+@@ -4,6 +4,7 @@
+ 
+ uintptr_t __stack_chk_guard;
+ 
++__attribute__((no_sanitize("safe-stack")))
+ void __init_ssp(void *entropy)
+ {
+ 	if (entropy) memcpy(&__stack_chk_guard, entropy, sizeof(uintptr_t));
 diff -Naur musl-1.2.3/src/internal/dynlink.h musl-1.2.3-patched/src/internal/dynlink.h
 --- musl-1.2.3/src/internal/dynlink.h	2022-10-21 08:13:49.816201281 -0700
 +++ musl-1.2.3-patched/src/internal/dynlink.h	2022-10-21 08:20:24.805114732 -0700

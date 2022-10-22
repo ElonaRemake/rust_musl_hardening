@@ -1,0 +1,61 @@
+diff -Naur hardened_malloc-11/config/default.mk hardened_malloc-11-patched/config/default.mk
+--- hardened_malloc-11/config/default.mk	2022-01-21 16:46:49.000000000 -0800
++++ hardened_malloc-11-patched/config/default.mk	2022-10-21 14:24:14.495301071 -0700
+@@ -1,6 +1,6 @@
+-CONFIG_WERROR := true
++CONFIG_WERROR := false
+ CONFIG_NATIVE := true
+-CONFIG_CXX_ALLOCATOR := true
++CONFIG_CXX_ALLOCATOR := false
+ CONFIG_UBSAN := false
+ CONFIG_SEAL_METADATA := false
+ CONFIG_ZERO_ON_FREE := true
+diff -Naur hardened_malloc-11/config/light.mk hardened_malloc-11-patched/config/light.mk
+--- hardened_malloc-11/config/light.mk	2022-01-21 16:46:49.000000000 -0800
++++ hardened_malloc-11-patched/config/light.mk	2022-10-21 14:24:14.518301842 -0700
+@@ -1,6 +1,6 @@
+-CONFIG_WERROR := true
++CONFIG_WERROR := false
+ CONFIG_NATIVE := true
+-CONFIG_CXX_ALLOCATOR := true
++CONFIG_CXX_ALLOCATOR := false
+ CONFIG_UBSAN := false
+ CONFIG_SEAL_METADATA := false
+ CONFIG_ZERO_ON_FREE := true
+diff -Naur hardened_malloc-11/Makefile hardened_malloc-11-patched/Makefile
+--- hardened_malloc-11/Makefile	2022-01-21 16:46:49.000000000 -0800
++++ hardened_malloc-11-patched/Makefile	2022-10-21 14:39:29.751107117 -0700
+@@ -36,7 +36,7 @@
+ 
+ CFLAGS := $(CFLAGS) -std=c17 $(SHARED_FLAGS) -Wmissing-prototypes
+ CXXFLAGS := $(CXXFLAGS) -std=c++17 -fsized-deallocation $(SHARED_FLAGS)
+-LDFLAGS := $(LDFLAGS) -Wl,-O1,--as-needed,-z,defs,-z,relro,-z,now,-z,nodlopen,-z,text
++LDFLAGS := $(LDFLAGS)
+ 
+ SOURCES := chacha.c h_malloc.c memory.c pages.c random.c util.c
+ OBJECTS := $(SOURCES:.c=.o)
+@@ -107,6 +107,9 @@
+ $(OUT)/libhardened_malloc$(SUFFIX).so: $(OBJECTS) | $(OUT)
+ 	$(CC) $(CFLAGS) $(LDFLAGS) -shared $^ $(LDLIBS) -o $@
+ 
++$(OUT)/libhardened_malloc$(SUFFIX).a: $(OBJECTS) | $(OUT)
++	$(AR) rc $@ $^
++
+ $(OUT):
+ 	mkdir -p $(OUT)
+ 
+@@ -132,11 +135,12 @@
+ 	clang-tidy --extra-arg=-std=c++17 $(filter %.cc,$(SOURCES)) -- $(CPPFLAGS)
+ 
+ clean:
+-	rm -f $(OUT)/libhardened_malloc.so $(OBJECTS)
++	rm -f $(OUT)/libhardened_malloc$(SUFFIX).so $(OBJECTS)
++	rm -f $(OUT)/libhardened_malloc$(SUFFIX).a $(OBJECTS)
+ 	$(MAKE) -C test/ clean
+ 
+ test: $(OUT)/libhardened_malloc$(SUFFIX).so
+ 	$(MAKE) -C test/
+ 	python3 -m unittest discover --start-directory test/
+ 
+-.PHONY: check clean tidy test
++build: $(OUT)/libhardened_malloc$(SUFFIX).so $(OUT)/libhardened_malloc$(SUFFIX).a
