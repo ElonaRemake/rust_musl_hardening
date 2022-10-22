@@ -68,7 +68,7 @@ build() {
 		--localstatedir=/var \
 		--enable-debug \
 		--disable-eh-frame
-	make -j$(nproc --all)
+	make -j$(nproc)
 }
 
 package() {

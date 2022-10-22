@@ -7,8 +7,8 @@ SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 rm -rf build
 mkdir build || exit 1
 
-rm -rf musl_root
-mkdir musl_root || exit 1
+rm -rf "$ALPINE_ROOT"
+mkdir -p "$ALPINE_ROOT" || exit 1
 
 if [ ! -d packages ]; then
   mkdir packages || exit 1
@@ -31,45 +31,37 @@ cd build/apk || exit 1
 cd ../.. || exit 1
 
 # Bootstrap Alpine Linux
-apk.static \
-  -X "$ALPINE_MIRROR/edge/main" -U -p musl_root --initdb \
-  --keys-dir "$APK_KEYS_PATH" --cache-dir "$(root_path packages/apk_cache)" add \
-  alpine-base alpine-sdk musl llvm15 clang15 gcc lld libstdc++-dev compiler-rt
+APK_REPOS="-X $ALPINE_MIRROR/edge/main -X $ALPINE_MIRROR/edge/community -X $ALPINE_MIRROR/edge/testing"
+APK_FLAGS="$APK_REPOS -U -p $ALPINE_ROOT --cache-dir $(root_path packages/apk_cache)"
+apk.static $APK_FLAGS --keys-dir "$APK_KEYS_PATH" --initdb add alpine-base proot qemu-x86_64
 
-# Activate the musl root since we're about to do some custom builds
-use_musl_root
-"$(/usr/bin/which busybox)" --install musl_root/bin || exit 1
-/usr/bin/sed --in-place=.bak "s_/bin/ash -e_/usr/bin/env ash_" musl_root/usr/bin/abuild || exit 1
+# Properly install Alpine Linux and our basic packages after bootstrapping
+alpine /bin/busybox --install -s || exit 1
+mkdir -p "$ALPINE_ROOT/home/$USER"
+cp "$SCRIPT_DIR/repositories" "$ALPINE_ROOT/etc/apk/repositories" || exit 1
+apk update
+apk upgrade
+apk add alpine-sdk llvm15 clang15 gcc lld libstdc++-dev compiler-rt autoconf automake
 
-# Setup abuild and our new repository
-export REPODEST="$(root_path build/packages)"
+# Install custom packages and set up abuild properly.
+REPODEST="$(root_path build/packages)"
 mkdir "$REPODEST" || exit 1
 if [ ! -d ~/.abuild ]; then
-  abuild-keygen -q -n -a || exit 1
+  alpine abuild-keygen -q -n -a || exit 1
 fi
 
+cp -v ~/.abuild/*.pub "$SCRIPT_DIR/apk/keys/"*.pub "$ALPINE_ROOT/etc/apk/keys"
+apk -U --no-cache add "$SCRIPT_DIR/apk/packages/aports/x86_64/make-4.3-r0.apk"
+
 # Build and install our customized musl
-cd build || exit 1
-  cp -r "$SCRIPT_DIR/musl" musl || exit 1
-  cd musl || exit 1
-    use_flags "$OPT_LEVEL $CFLAGS_BASIC $CFLAGS_HARDENING_BASIC"
-    abuild || exit 1
-  cd .. || exit 1
-cd .. || exit 1
-apk -U -p musl_root --keys-dir ~/.abuild --no-cache \
-  add "$REPODEST/build/x86_64"/musl-*.apk
+use_flags "$OPT_LEVEL $CFLAGS_BASIC $CFLAGS_HARDENING_BASIC"
+abuild_dir "$SCRIPT_DIR/aports/musl"
+apk -U --no-cache add "$APK_PACKAGE_ROOT"/musl-dev-*.apk
 
 # Build our custom hardened-malloc
-cd build || exit 1
-  cp -r "$SCRIPT_DIR/hardened-malloc" hardened-malloc || exit 1
-  cd hardened-malloc || exit 1
-    use_flags "$OPT_LEVEL $CFLAGS_BASIC $CFLAGS_HARDENING -fvisibility=hidden"
-    abuild || exit 1
-  cd .. || exit 1
-cd .. || exit 1
-apk \
-  -X "$REPODEST/build" -U -p musl_root --keys-dir ~/.abuild --no-cache \
-  add hardened-malloc
+use_flags "$OPT_LEVEL $CFLAGS_BASIC $CFLAGS_HARDENING -fvisibility=hidden"
+abuild_dir "$SCRIPT_DIR/aports/hardened-malloc"
+apk -U --no-cache add hardened-malloc
 
 # Delete the build directory
 rm -rf build
