@@ -90,8 +90,8 @@ apk() {
 }
 
 # Important internal variables
-ALPINE_ROOT="$(root_path musl_root)"
-ALPINE_USR_ROOT="$(root_path musl_usr)"
+ALPINE_ROOT="$(root_path alpine_root)"
+ALPINE_USR_ROOT="$(root_path alpine_usr)"
 PACKAGE_ROOT="$(root_path packages)"
 REPO_ROOT="$(dirname "$(cargo locate-project --workspace --message-format plain || exit 1)")"
 APK_BUILD_ROOT="$(root_path build/apk_packages)"
