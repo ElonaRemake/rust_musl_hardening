@@ -72,7 +72,7 @@ alpine() {
       LIBRARY_PATH="$ALPINE_USR_ROOT/lib:/lib:/usr/lib:/usr/local/lib" \
       C_INCLUDE_PATH="$ALPINE_USR_ROOT/include:/include:/usr/include:/usr/local/include" \
       CPLUS_INCLUDE_PATH="$ALPINE_USR_ROOT/include:/include:/usr/include:/usr/local/include" \
-      CFLAGS="$ALPINE_CFLAGS" ALPINE_LDFLAGS="$ALPINE_LDFLAGS" \
+      CFLAGS="$ALPINE_CFLAGS" LDFLAGS="$ALPINE_LDFLAGS" \
     "$@"
 }
 abuild_dir() {
@@ -115,13 +115,15 @@ CFLAGS_STATIC="$(strip_flags "
 ")"
 CFLAGS_LTO="$(strip_flags "
   -flto=full -Wl,--lto-whole-program-visibility
+  -fvirtual-function-elimination -fwhole-program-vtables
 ")"
 CFLAGS_HARDENING_BASIC="$(strip_flags "
   -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fstack-clash-protection
 ")"
 CFLAGS_HARDENING="$(strip_flags "
   $CFLAGS_LTO $CFLAGS_HARDENING_BASIC
-  -fsanitize=cfi -fvirtual-function-elimination -fsanitize=safe-stack
+  -fsanitize=cfi  -fsanitize=safe-stack
+  -frandomize-layout-seed-file=$ALPINE_ROOT/etc/randomize-layout-seed
 ")"
 
 CFLAGS_COMMON="$CFLAGS_STATIC $OPT_LEVEL $CFLAGS_BASIC $CFLAGS_HARDENING -fvisibility=hidden"

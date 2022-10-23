@@ -5,17 +5,14 @@ SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 # Recreate the relevant directories
 rm -rf build
-mkdir build || exit 1
-
 rm -rf "$ALPINE_ROOT"
+rm -rf "$ALPINE_USR_ROOT"
+
+mkdir build || exit 1
 mkdir -p "$ALPINE_ROOT" || exit 1
 
-if [ ! -d packages ]; then
-  mkdir packages || exit 1
-fi
-if [ ! -d packages/apk_cache ]; then
-  mkdir packages/apk_cache || exit 1
-fi
+mkdir -p packages || exit 1
+mkdir -p packages/apk_cache || exit 1
 
 # Download and extract the bootstrap
 mkdir build/apk || exit 1
@@ -53,6 +50,8 @@ fi
 cp -v ~/.abuild/*.pub "$SCRIPT_DIR/apk/keys/"*.pub "$ALPINE_ROOT/etc/apk/keys"
 apk -U --no-cache add "$SCRIPT_DIR/apk/packages/aports/x86_64/make-4.3-r0.apk"
 
+dd if=/dev/urandom of="$ALPINE_ROOT/etc/randomize-layout-seed" bs=1 count=1024 || exit 1
+
 # Build and install our customized musl
 use_flags "$OPT_LEVEL $CFLAGS_BASIC $CFLAGS_HARDENING_BASIC"
 abuild_dir "$SCRIPT_DIR/aports/musl"
@@ -61,7 +60,7 @@ apk -U --no-cache add "$APK_PACKAGE_ROOT"/musl-dev-*.apk
 # Build our custom hardened-malloc
 use_flags "$OPT_LEVEL $CFLAGS_BASIC $CFLAGS_HARDENING -fvisibility=hidden"
 abuild_dir "$SCRIPT_DIR/aports/hardened-malloc"
-apk -U --no-cache add hardened-malloc
+apk -U --no-cache add "$APK_PACKAGE_ROOT"/hardened-malloc-*.apk
 
 # Install rustc
 apk add rustup
