@@ -50,7 +50,7 @@ fi
 cp -v ~/.abuild/*.pub "$SCRIPT_DIR/apk/keys/"*.pub "$ALPINE_ROOT/etc/apk/keys"
 apk -U --no-cache add "$SCRIPT_DIR/apk/packages/aports/x86_64/make-4.3-r0.apk"
 
-dd if=/dev/urandom of="$ALPINE_ROOT/etc/randomize-layout-seed" bs=1 count=1024 || exit 1
+od -A n -t x8 -N 32 /dev/random | tr -d ' \n' > "$ALPINE_ROOT/etc/randomize-layout-seed" || exit 1
 
 # Build and install our customized musl
 use_flags "$OPT_LEVEL $CFLAGS_BASIC $CFLAGS_HARDENING_BASIC"

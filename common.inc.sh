@@ -101,6 +101,8 @@ APK_BUILD_ROOT="$(root_path build/apk_packages)"
 APK_REPO_ROOT="$(root_path build/apk_repo)"
 APK_PACKAGE_ROOT="$APK_REPO_ROOT/apk_packages/x86_64"
 
+export RANDOMIZE_STRUCT_SEED="$(cat $ALPINE_ROOT/etc/randomize-layout-seed)"
+
 # Common C Flags
 if [ "$OPT_LEVEL" = "" ]; then
   OPT_LEVEL="-Os"
